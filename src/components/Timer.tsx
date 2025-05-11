@@ -14,6 +14,7 @@ interface FocusTime {
 
 export function Timer() {
   const [endTime, setEndTime] = useState<Date | null>(null);
+  const [startTime, setStartTime] = useState<Date | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [timeSpent, setTimeSpent] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -23,38 +24,76 @@ export function Timer() {
   const [showResetAlert, setShowResetAlert] = useState(false);
   const [totalDuration, setTotalDuration] = useState(0);
   const [isTimeSelectorVisible, setIsTimeSelectorVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
+    let progressInterval: NodeJS.Timeout;
     
     if (isRunning && endTime) {
       setIsTimeSelectorVisible(false);
-      const initialDuration = differenceInSeconds(endTime, new Date());
+      const initialDuration = differenceInMinutes(endTime, new Date());
       setTotalDuration(initialDuration);
+
+      if (!startTime) {
+        setStartTime(new Date());
+      }
 
       interval = setInterval(() => {
         const now = new Date();
-        const spent = Math.floor((now.getTime() - new Date().getTime()) / 1000);
-        const left = Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / 1000));
+        const left = Math.max(0, differenceInMinutes(endTime, now));
         
-        setTimeSpent(spent);
+        if (startTime) {
+          const elapsed = Math.max(0, differenceInMinutes(now, startTime));
+          setTimeSpent(elapsed);
+        }
+        
         setTimeLeft(left);
 
         if (left === 0) {
           setIsCompleted(true);
           setIsRunning(false);
+          setProgress(100);
+        }
+      }, 60000);
+
+      progressInterval = setInterval(() => {
+        if (startTime) {
+          const now = new Date();
+          const totalSeconds = initialDuration * 60;
+          const elapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+          const currentProgress = Math.min(100, (elapsedSeconds / totalSeconds) * 100);
+          setProgress(currentProgress);
         }
       }, 1000);
     }
 
-    return () => clearInterval(interval);
-  }, [isRunning, endTime]);
+    return () => {
+      clearInterval(interval);
+      clearInterval(progressInterval);
+    };
+  }, [isRunning, endTime, startTime]);
+
+  useEffect(() => {
+    if (isRunning) {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '타이머가 초기화됩니다. 다시 시작할까요?';
+        return e.returnValue;
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+  }, [isRunning]);
 
   const handleStart = () => {
     if (endTime) {
+      setStartTime(new Date());
       setIsRunning(true);
       setIsCompleted(false);
       setIsTimeSelectorVisible(false);
+      setProgress(0);
     }
   };
 
@@ -63,6 +102,7 @@ export function Timer() {
   };
 
   const confirmReset = () => {
+    setStartTime(null);
     window.location.reload();
   };
 
@@ -105,25 +145,44 @@ export function Timer() {
 
   const focusTime = calculateFocusTime();
 
-  const progress = endTime && timeLeft > 0
-    ? ((endTime.getTime() - new Date().getTime() - timeLeft * 1000) / (endTime.getTime() - new Date().getTime())) * 100
-    : 0;
-
-  const formatTimeDisplay = (seconds: number) => {
-    const totalMinutes = Math.floor(seconds / 60);
-    return `${totalMinutes}`;
-  };
-
-  const getSpentMinutes = () => {
-    if (!focusTime) return 0;
-    const totalFocusMinutes = focusTime.totalMinutes;
-    const leftMinutes = Math.ceil(timeLeft / 60);
-    return totalFocusMinutes - leftMinutes;
+  const getElapsedMinutes = () => {
+    if (!isRunning || !startTime) return 0;
+    const now = new Date();
+    return Math.max(0, differenceInMinutes(now, startTime));
   };
 
   const getLeftMinutes = () => {
-    if (!focusTime) return 0;
-    return Math.ceil(timeLeft / 60);
+    if (!endTime) return 0;
+    const now = new Date();
+    return Math.max(0, Math.floor(differenceInMinutes(endTime, now)));
+  };
+
+  const calculateProgress = () => {
+    if (!isRunning || !focusTime) return 0;
+    const elapsed = getElapsedMinutes();
+    return (elapsed / focusTime.totalMinutes) * 100;
+  };
+
+  const progressPercentage
+   = calculateProgress();
+
+  const formatDuration = (minutes: number) => {
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours}시간 ${remainingMinutes}분`;
+    }
+    return `${minutes}분`;
+  };
+
+  const formatTimeDisplay = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours}시간 ${remainingMinutes}분`;
+    }
+    return `${minutes}분`;
   };
 
   return (
@@ -161,16 +220,13 @@ export function Timer() {
             <CircleTimer
               isRunning={isRunning}
               isCompleted={isCompleted}
-              timeSpent={timeSpent}
-              timeLeft={timeLeft}
-              totalDuration={totalDuration}
-              timeDisplay={formatTimeDisplay(timeLeft)}
+              progress={progress}
             />
           </div>
           <div className="w-full mt-2">
             <TimerInfo
               isRunning={isRunning}
-              timeSpentMinutes={getSpentMinutes()}
+              elapsedMinutes={getElapsedMinutes()}
               timeLeftMinutes={getLeftMinutes()}
               isCompleted={isCompleted}
             />
@@ -180,6 +236,7 @@ export function Timer() {
           <div className="w-full mt-16">
             <TimerButtons
               isRunning={isRunning}
+              isCompleted={isCompleted}
               endTime={endTime}
               focusTime={focusTime}
               onStart={handleStart}

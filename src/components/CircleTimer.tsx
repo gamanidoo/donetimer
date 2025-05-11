@@ -1,31 +1,17 @@
 interface CircleTimerProps {
   isRunning: boolean;
   isCompleted: boolean;
-  timeSpent: number;
-  timeLeft: number;
-  totalDuration: number;
-  timeDisplay: string;
+  progress: number;
 }
 
 export function CircleTimer({
   isRunning,
   isCompleted,
-  timeSpent,
-  timeLeft,
-  totalDuration,
-  timeDisplay
+  progress
 }: CircleTimerProps) {
   // SVG 원의 둘레 계산 (r * 2 * PI)
   const CIRCLE_CIRCUMFERENCE = 283; // 45 * 2 * 3.14159
 
-  // 진행률 계산 (0-100)
-  const calculateProgress = () => {
-    if (isCompleted) return 100;
-    if (!isRunning || totalDuration === 0) return 0;
-    return (timeSpent / totalDuration) * 100;
-  };
-
-  const progress = calculateProgress();
   const dashOffset = CIRCLE_CIRCUMFERENCE * (1 - progress / 100);
 
   return (
@@ -61,17 +47,12 @@ export function CircleTimer({
         )}
       </svg>
 
-      {/* 중앙 시간 표시 */}
+      {/* 중앙 진행률 표시 */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
         {isRunning && (
-          <>
-            <div className="text-4xl font-bold mb-2">
-              {timeDisplay}
-            </div>
-            <div className="text-sm text-gray-400">
-              {Math.floor(progress)}%
-            </div>
-          </>
+          <div className="text-sm text-gray-400">
+            {Math.floor(progress)}%
+          </div>
         )}
         
         {isCompleted && (

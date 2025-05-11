@@ -1,13 +1,22 @@
 interface TimerInfoProps {
   isRunning: boolean;
-  timeSpentMinutes: number;
+  elapsedMinutes: number;
   timeLeftMinutes: number;
   isCompleted: boolean;
 }
 
+const formatDuration = (minutes: number) => {
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}시간 ${remainingMinutes}분`;
+  }
+  return `${minutes}분`;
+};
+
 export function TimerInfo({ 
   isRunning, 
-  timeSpentMinutes, 
+  elapsedMinutes, 
   timeLeftMinutes, 
   isCompleted 
 }: TimerInfoProps) {
@@ -18,10 +27,10 @@ export function TimerInfo({
       {isRunning && (
         <>
           <p className="text-gray-400">
-            보낸 시간: {timeSpentMinutes}분
+            경과 시간: {formatDuration(elapsedMinutes)}
           </p>
           <p className="text-gray-400">
-            남은 시간: {timeLeftMinutes}분
+            남은 시간: {formatDuration(timeLeftMinutes)}
           </p>
         </>
       )}
