@@ -12,6 +12,7 @@ export function CircleTimer({
   // SVG 원의 둘레 계산 (r * 2 * PI)
   const CIRCLE_CIRCUMFERENCE = 283; // 45 * 2 * 3.14159
 
+  // 진행률에 따른 원호 길이 계산
   const dashOffset = CIRCLE_CIRCUMFERENCE * (1 - progress / 100);
 
   return (
@@ -29,12 +30,12 @@ export function CircleTimer({
           cy="50"
         />
         
-        {/* 진행 원 */}
+        {/* 진행 원호 */}
         {(isRunning || isCompleted) && (
           <circle
             className={`
               fill-none transition-all duration-1000 ease-in-out
-              ${isCompleted ? 'stroke-green-400' : 'stroke-[#8B95F2]'}
+              ${isCompleted ? 'stroke-[#4ADE80]' : 'stroke-[#8B95F2]'}
             `}
             strokeWidth="8"
             r="45"
@@ -47,16 +48,16 @@ export function CircleTimer({
         )}
       </svg>
 
-      {/* 중앙 진행률 표시 */}
+      {/* 중앙 텍스트 */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
         {isRunning && (
-          <div className="text-sm text-gray-400">
+          <div className="text-2xl font-bold text-[#8B95F2]">
             {Math.floor(progress)}%
           </div>
         )}
         
         {isCompleted && (
-          <div className="text-2xl font-bold text-green-400 animate-bounce">
+          <div className="text-2xl font-bold text-[#4ADE80] animate-bounce">
             완료!
           </div>
         )}

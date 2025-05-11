@@ -14,7 +14,8 @@ const TIMER_MESSAGES = {
   INITIAL: "종료 시각을 선택하세요",
   COMPLETED: "🎉 집중 완료!",
   TIME_SELECTED: (duration: string) => `${duration} 집중하기`,
-  RUNNING: (endTime: string, duration: string) => `${endTime}까지, ${duration} 남았어요`
+  // duration은 전체 집중 시간을 나타냄 (남은 시간이 아님)
+  RUNNING: (endTime: string, duration: string) => `${endTime}까지, ${duration}동안 집중해요`
 } as const;
 
 export function TimerHeader({ 
@@ -47,7 +48,7 @@ export function TimerHeader({
       };
     }
 
-    // 타이머 작동 중
+    // 타이머 작동 중 - focusTime.totalMinutes는 전체 집중 시간을 나타냄
     if (isRunning && endTime && focusTime) {
       return {
         text: TIMER_MESSAGES.RUNNING(

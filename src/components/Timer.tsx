@@ -22,57 +22,193 @@ export function Timer() {
   const [hours, setHours] = useState("");
   const [minutes, setMinutes] = useState("");
   const [showResetAlert, setShowResetAlert] = useState(false);
-  const [totalDuration, setTotalDuration] = useState(0);
   const [isTimeSelectorVisible, setIsTimeSelectorVisible] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [updateInterval, setUpdateInterval] = useState(1000);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let progressInterval: NodeJS.Timeout;
+  // 시간 입력 상태를 하나의 객체로 관리
+  const [timeInput, setTimeInput] = useState({
+    hours: '',
+    minutes: '',
+    isValid: false
+  });
+
+  // 집중 시간 계산 함수
+  const calculateFocusTime = () => {
+    if (!endTime) return null;
     
-    if (isRunning && endTime) {
-      setIsTimeSelectorVisible(false);
-      const initialDuration = differenceInMinutes(endTime, new Date());
-      setTotalDuration(initialDuration);
+    // 시작 전: 현재 시각을 시작 시각으로 사용
+    const baseTime = new Date();
+    baseTime.setMinutes(baseTime.getMinutes());
+    baseTime.setSeconds(0, 0);
+    
+    // 시작 후: 시작 시각과 종료 시각의 차이를 집중 시간으로 사용
+    if (isRunning && startTime) {
+      const focusMinutes = differenceInMinutes(endTime, startTime);
+      if (focusMinutes <= 0) return null;
+      return { totalMinutes: focusMinutes };
+    }
+    
+    const diffMinutes = differenceInMinutes(endTime, baseTime);
+    if (diffMinutes <= 0) return null;
+    return { totalMinutes: diffMinutes };
+  };
 
-      if (!startTime) {
-        setStartTime(new Date());
+  // 시작 시각 표시 함수
+  const getStartTimeDisplay = () => {
+    if (isRunning && startTime) {
+      return format(startTime, 'HH:mm');
+    }
+    return format(new Date(), 'HH:mm');
+  };
+
+  // 시간 입력값 검증
+  const validateTimeInput = (hours: number, minutes: number): boolean => {
+    if (hours < 0 || hours > 23) return false;
+    if (minutes < 0 || minutes > 59) return false;
+    return true;
+  };
+
+  // 종료 시각이 현재보다 이전인지 확인
+  const isTimeBeforeNow = (hours: number, minutes: number): boolean => {
+    const now = new Date();
+    const inputTime = new Date();
+    inputTime.setHours(hours, minutes, 0, 0);
+    return inputTime <= now;
+  };
+
+  // 시간 입력 처리
+  const handleTimeInput = (value: string, type: 'hours' | 'minutes') => {
+    // 숫자가 아닌 문자 제거
+    const numericValue = value.replace(/[^0-9]/g, '');
+    
+    // 빈 값 처리
+    if (numericValue === '') {
+      const newTimeInput = {
+        ...timeInput,
+        [type]: ''
+      };
+      setTimeInput(newTimeInput);
+      return;
+    }
+
+    // 최대 2자리까지만 처리
+    const truncatedValue = numericValue.slice(0, 2);
+    const numValue = parseInt(truncatedValue);
+
+    // 첫 번째 숫자 입력 시 (한 자리 숫자)
+    if (truncatedValue.length === 1) {
+      // 시간일 때 3보다 크면 앞에 0을 붙임 (예: 5 → 05)
+      if (type === 'hours' && numValue > 2) {
+        const newTimeInput = {
+          ...timeInput,
+          [type]: `0${numValue}`
+        };
+        setTimeInput(newTimeInput);
+        return;
+      }
+      // 분일 때 6보다 크면 앞에 0을 붙임 (예: 7 → 07)
+      if (type === 'minutes' && numValue > 5) {
+        const newTimeInput = {
+          ...timeInput,
+          [type]: `0${numValue}`
+        };
+        setTimeInput(newTimeInput);
+        return;
+      }
+    }
+
+    // 두 자리 숫자 입력 시 범위 검사
+    if (truncatedValue.length === 2) {
+      if (type === 'hours' && numValue > 23) {
+        const newTimeInput = {
+          ...timeInput,
+          [type]: '23'
+        };
+        setTimeInput(newTimeInput);
+        return;
+      }
+      if (type === 'minutes' && numValue > 59) {
+        const newTimeInput = {
+          ...timeInput,
+          [type]: '59'
+        };
+        setTimeInput(newTimeInput);
+        return;
+      }
+    }
+
+    // 상태 업데이트
+    const newTimeInput = {
+      ...timeInput,
+      [type]: truncatedValue
+    };
+
+    // 유효성 검증
+    const hours = parseInt(type === 'hours' ? truncatedValue : timeInput.hours) || 0;
+    const minutes = parseInt(type === 'minutes' ? truncatedValue : timeInput.minutes) || 0;
+    newTimeInput.isValid = validateTimeInput(hours, minutes);
+
+    setTimeInput(newTimeInput);
+
+    // 유효한 시간이고 두 필드 모두 입력되었을 때만 종료 시각 업데이트
+    if (newTimeInput.isValid && 
+        ((type === 'hours' && timeInput.minutes) || 
+         (type === 'minutes' && timeInput.hours))) {
+      const newEndTime = new Date();
+      newEndTime.setHours(hours, minutes, 0, 0);
+
+      // 현재 시각보다 이전이면 다음 날로 설정
+      if (isTimeBeforeNow(hours, minutes)) {
+        newEndTime.setDate(newEndTime.getDate() + 1);
       }
 
-      interval = setInterval(() => {
-        const now = new Date();
-        const left = Math.max(0, differenceInMinutes(endTime, now));
-        
-        if (startTime) {
-          const elapsed = Math.max(0, differenceInMinutes(now, startTime));
-          setTimeSpent(elapsed);
-        }
-        
-        setTimeLeft(left);
+      setEndTime(newEndTime);
+    }
+  };
 
-        if (left === 0) {
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (isRunning && startTime && endTime) {
+      const updateTimer = () => {
+        const now = new Date();
+        now.setSeconds(0, 0);  // 초와 밀리초를 0으로 설정
+        
+        const elapsedMs = now.getTime() - startTime.getTime();
+        const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+        
+        // 경과 시간에 따른 업데이트 주기 조정
+        const newInterval = elapsedMinutes === 0 ? 1000 : 60000;
+        if (newInterval !== updateInterval) {
+          setUpdateInterval(newInterval);
+          clearInterval(timer);
+          timer = setInterval(updateTimer, newInterval);
+        }
+
+        // 시간 업데이트
+        setTimeSpent(elapsedMinutes);
+        setTimeLeft(Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / (1000 * 60))));
+        
+        // 진행률 업데이트
+        const currentProgress = calculateProgress();
+        setProgress(currentProgress);
+
+        // 완료 체크
+        if (now >= endTime) {
           setIsCompleted(true);
           setIsRunning(false);
           setProgress(100);
+          clearInterval(timer);
         }
-      }, 60000);
+      };
 
-      progressInterval = setInterval(() => {
-        if (startTime) {
-          const now = new Date();
-          const totalSeconds = initialDuration * 60;
-          const elapsedSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
-          const currentProgress = Math.min(100, (elapsedSeconds / totalSeconds) * 100);
-          setProgress(currentProgress);
-        }
-      }, 1000);
+      updateTimer(); // 초기 업데이트
+      timer = setInterval(updateTimer, updateInterval);
     }
 
-    return () => {
-      clearInterval(interval);
-      clearInterval(progressInterval);
-    };
-  }, [isRunning, endTime, startTime]);
+    return () => clearInterval(timer);
+  }, [isRunning, startTime, endTime, updateInterval]);
 
   useEffect(() => {
     if (isRunning) {
@@ -87,14 +223,25 @@ export function Timer() {
     }
   }, [isRunning]);
 
+  // 시작 버튼 핸들러
   const handleStart = () => {
-    if (endTime) {
-      setStartTime(new Date());
-      setIsRunning(true);
-      setIsCompleted(false);
-      setIsTimeSelectorVisible(false);
-      setProgress(0);
+    if (!timeInput.isValid || !endTime) return;
+
+    const now = new Date();
+    now.setSeconds(0, 0);  // 초와 밀리초를 0으로 설정
+    
+    // 현재 시각이 종료 시각을 지났는지 다시 한번 확인
+    if (endTime <= now) {
+      const newEndTime = new Date(endTime);
+      newEndTime.setDate(newEndTime.getDate() + 1);
+      setEndTime(newEndTime);
     }
+
+    setStartTime(now);
+    setIsRunning(true);
+    setIsCompleted(false);
+    setIsTimeSelectorVisible(false);
+    setProgress(0);
   };
 
   const handleReset = () => {
@@ -110,37 +257,13 @@ export function Timer() {
     setShowResetAlert(false);
   };
 
-  const handleTimeChange = (value: string, type: 'hours' | 'minutes') => {
-    let numValue = parseInt(value) || 0;
-    let newHours = type === 'hours' ? numValue : parseInt(hours) || 0;
-    let newMinutes = type === 'minutes' ? numValue : parseInt(minutes) || 0;
-    
-    if (type === 'hours') {
-      newHours = Math.min(Math.max(newHours, 0), 23);
-      setHours(newHours.toString().padStart(2, '0'));
-    } else {
-      newMinutes = Math.min(Math.max(newMinutes, 0), 59);
-      setMinutes(newMinutes.toString().padStart(2, '0'));
-    }
-
-    const newEndTime = new Date();
-    newEndTime.setHours(newHours, newMinutes, 0);
-    
-    if (newEndTime < new Date()) {
-      newEndTime.setDate(newEndTime.getDate() + 1);
-    }
-    
-    setEndTime(newEndTime);
-  };
-
-  const calculateFocusTime = () => {
-    if (!endTime) return null;
+  // 진행률 계산 함수
+  const calculateProgress = () => {
+    if (!isRunning || !startTime || !endTime) return 0;
     const now = new Date();
-    const diffMinutes = differenceInMinutes(endTime, now);
-    
-    if (diffMinutes <= 0) return null;
-    
-    return { totalMinutes: diffMinutes };
+    const totalMs = endTime.getTime() - startTime.getTime();
+    const elapsedMs = now.getTime() - startTime.getTime();
+    return Math.min(100, Math.max(0, Math.floor((elapsedMs / totalMs) * 100)));
   };
 
   const focusTime = calculateFocusTime();
@@ -154,13 +277,8 @@ export function Timer() {
   const getLeftMinutes = () => {
     if (!endTime) return 0;
     const now = new Date();
+    now.setSeconds(0, 0);  // 초와 밀리초를 0으로 설정
     return Math.max(0, Math.floor(differenceInMinutes(endTime, now)));
-  };
-
-  const calculateProgress = () => {
-    if (!isRunning || !focusTime) return 0;
-    const elapsed = getElapsedMinutes();
-    return (elapsed / focusTime.totalMinutes) * 100;
   };
 
   const progressPercentage
@@ -205,11 +323,12 @@ export function Timer() {
         {((isTimeSelectorVisible && isRunning) || !isRunning) && (
           <div className="mb-6">
             <TimeSelector
-              hours={hours}
-              minutes={minutes}
+              hours={timeInput.hours}
+              minutes={timeInput.minutes}
               isRunning={isRunning}
               endTime={endTime}
-              onTimeChange={handleTimeChange}
+              onTimeChange={handleTimeInput}
+              isValid={timeInput.isValid}
             />
           </div>
         )}
