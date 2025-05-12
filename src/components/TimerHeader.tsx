@@ -15,7 +15,7 @@ const TIMER_MESSAGES = {
   COMPLETED: "🎉 집중 완료!",
   TIME_SELECTED: (duration: string) => `${duration} 집중하기`,
   // duration은 전체 집중 시간을 나타냄 (남은 시간이 아님)
-  RUNNING: (endTime: string, duration: string) => `${endTime}까지, ${duration}동안 집중해요`
+  RUNNING: (endTime: string, duration: string) => `${endTime}까지\n${duration}동안 집중해요`
 } as const;
 
 export function TimerHeader({ 
@@ -55,7 +55,7 @@ export function TimerHeader({
           formatTime(endTime),
           formatMinutes(focusTime.totalMinutes)
         ),
-        className: "text-2xl font-bold mb-2 text-[#A5AEFF]",
+        className: "text-2xl font-bold mb-2 text-[#A5AEFF] whitespace-pre-line",
         showTimeSelector: true
       };
     }
