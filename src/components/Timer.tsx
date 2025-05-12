@@ -88,7 +88,26 @@ export function Timer() {
         ...timeInput,
         [type]: ''
       };
-      setTimeInput(newTimeInput);
+      
+      // 시간이 입력되어 있고 분이 비어있을 때 자동으로 00으로 설정
+      if (type === 'minutes' && timeInput.hours && timeInput.hours.length > 0) {
+        newTimeInput.minutes = '00';
+        const hours = parseInt(timeInput.hours) || 0;
+        newTimeInput.isValid = validateTimeInput(hours, 0);
+        
+        if (newTimeInput.isValid) {
+          const newEndTime = new Date();
+          newEndTime.setHours(hours, 0, 0, 0);
+          
+          if (isTimeBeforeNow(hours, 0)) {
+            newEndTime.setDate(newEndTime.getDate() + 1);
+          }
+          
+          setEndTime(newEndTime);
+        }
+      } else {
+        setTimeInput(newTimeInput);
+      }
       return;
     }
 
@@ -102,7 +121,8 @@ export function Timer() {
       if (type === 'hours' && numValue > 2) {
         const newTimeInput = {
           ...timeInput,
-          [type]: `0${numValue}`
+          [type]: `0${numValue}`,
+          minutes: timeInput.minutes || '00' // 분이 비어있으면 00으로 설정
         };
         setTimeInput(newTimeInput);
         return;
@@ -123,7 +143,8 @@ export function Timer() {
       if (type === 'hours' && numValue > 23) {
         const newTimeInput = {
           ...timeInput,
-          [type]: '23'
+          [type]: '23',
+          minutes: timeInput.minutes || '00' // 분이 비어있으면 00으로 설정
         };
         setTimeInput(newTimeInput);
         return;
@@ -144,17 +165,20 @@ export function Timer() {
       [type]: truncatedValue
     };
 
+    // 시간 입력 시 분이 비어있으면 00으로 설정
+    if (type === 'hours') {
+      newTimeInput.minutes = timeInput.minutes || '00';
+    }
+
     // 유효성 검증
     const hours = parseInt(type === 'hours' ? truncatedValue : timeInput.hours) || 0;
-    const minutes = parseInt(type === 'minutes' ? truncatedValue : timeInput.minutes) || 0;
+    const minutes = parseInt(type === 'minutes' ? truncatedValue : (newTimeInput.minutes || '0')) || 0;
     newTimeInput.isValid = validateTimeInput(hours, minutes);
 
     setTimeInput(newTimeInput);
 
-    // 유효한 시간이고 두 필드 모두 입력되었을 때만 종료 시각 업데이트
-    if (newTimeInput.isValid && 
-        ((type === 'hours' && timeInput.minutes) || 
-         (type === 'minutes' && timeInput.hours))) {
+    // 유효한 시간이면 종료 시각 업데이트
+    if (newTimeInput.isValid && newTimeInput.hours) {
       const newEndTime = new Date();
       newEndTime.setHours(hours, minutes, 0, 0);
 
